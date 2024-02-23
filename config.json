@@ -1,0 +1,9 @@
+{
+  "service_name": "auth",
+  "service_environment": "dev",
+  "postgresql_url": "postgresql://arkam:Arkam2004@localhost:5432/postgres",
+  "nats_url": "nats://localhost:4222",
+  "outbox_table": "events",
+  "polling_interval": 250,
+  "batch_size": 100
+}
