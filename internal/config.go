@@ -1,6 +1,10 @@
 package internal
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+)
 
 const (
 	ServiceEnvironmentDev  = "dev"
@@ -16,7 +20,6 @@ type Config struct {
 	OutboxTable        string `json:"outbox_table" mapstructure:"outbox_table"`
 	PollingInterval    int    `json:"polling_interval" mapstructure:"polling_interval"`
 	BatchSize          int    `json:"batch_size" mapstructure:"batch_size"`
-	RetryLimit         int    `json:"retry_limit" mapstructure:"retry_limit"`
 }
 
 func (c *Config) IsValid() error {
@@ -59,8 +62,37 @@ func (c *Config) SetDefaults() {
 	if c.BatchSize == 0 {
 		c.BatchSize = 1000
 	}
+}
 
-	if c.RetryLimit == 0 {
-		c.RetryLimit = 10
+func NewConfig() *Config {
+	var config Config
+
+	v := viper.New()
+
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
 	}
+
+	v.AddConfigPath(".")
+	v.AddConfigPath("../")
+
+	err = v.ReadInConfig()
+	if err != nil {
+		logger.Fatal("error reading config", zap.Error(err))
+	}
+
+	err = v.Unmarshal(&config)
+	if err != nil {
+		logger.Fatal("error unmarshaling config", zap.Error(err))
+	}
+
+	config.SetDefaults()
+
+	err = config.IsValid()
+	if err != nil {
+		logger.Fatal("error validating config", zap.Error(err))
+	}
+
+	return &config
 }
