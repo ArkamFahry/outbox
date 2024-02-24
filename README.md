@@ -76,8 +76,20 @@ begin
     new.status = 'pending';
     new.published_at = null;
     new.created_at = now();
+    new.updated_at = null;
 
     return new;
+end;
+$$ language plpgsql;
+
+create or replace function on_events_update()
+    returns trigger as
+$$
+begin
+    new.version = new.version + 1;
+    new.updated_at = now();
+
+return new;
 end;
 $$ language plpgsql;
 
@@ -91,6 +103,7 @@ create table if not exists events
     status           text          not null,
     published_at     timestamptz   null,
     created_at       timestamptz   not null,
+    updated_at       timestamptz   null,
     constraint events_id_primary_key primary key (id),
     constraint events_id_version_unique unique (id, version),
     constraint events_id_check check ( trim(id) <> '' ),
@@ -105,4 +118,10 @@ create or replace trigger on_events_create
     on events
     for each row
 execute function on_events_create();
+       
+create or replace trigger on_events_update
+    before update
+    on events
+    for each row
+execute function on_events_update();
 ```
