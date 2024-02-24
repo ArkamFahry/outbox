@@ -3,9 +3,10 @@ package internal
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
-	"sync"
 )
 
 type EventPublisherWorker struct {
@@ -22,69 +23,60 @@ func NewEventPublisherWorker(database IDatabase, eventStore IEventStore, logger 
 	}
 }
 
-func (w *EventPublisherWorker) Work(ctx context.Context) error {
-	var publishedEventIds []string
-	var failedEventIds []string
-	var mutex sync.Mutex
+func (w *EventPublisherWorker) Work(ctx context.Context) {
+	for i := 0; i < 10; i++ {
+		go func() {
+			for {
+				var publishedEventIds []string
+				var failedEventIds []string
 
-	err := w.database.WithTransaction(ctx, func(tx pgx.Tx) error {
-		events, err := w.database.GetEvents(ctx, tx)
-		if err != nil {
-			if errors.Is(err, ErrEventNotFound) {
-				return nil
-			}
-			w.logger.Error("failed to get events", zap.Error(err))
-			return err
-		}
+				err := w.database.WithTransaction(ctx, func(tx pgx.Tx) error {
+					events, err := w.database.GetEvents(ctx, tx)
+					if err != nil {
+						if errors.Is(err, ErrEventNotFound) {
+							return nil
+						}
+						w.logger.Error("failed to get events", zap.Error(err))
+						return err
+					}
 
-		var waitGroup sync.WaitGroup
+					for _, event := range events {
+						err = w.eventStore.Publish(event)
+						if err != nil {
+							w.logger.Error("failed to publish event", zap.Error(err))
+							failedEventIds = append(failedEventIds, event.Id)
+						}
+						publishedEventIds = append(publishedEventIds, event.Id)
+					}
 
-		for _, event := range events {
-			waitGroup.Add(1)
-			go func(event *Event) {
-				defer waitGroup.Done()
+					err = w.database.UpdateEventsStatusPublished(ctx, tx, publishedEventIds)
+					if err != nil {
+						w.logger.Error(
+							"failed to update events status to published",
+							zap.Error(err),
+							zap.Strings("published_event_ids", publishedEventIds),
+						)
+						return err
+					}
 
-				err = w.eventStore.Publish(event)
+					err = w.database.UpdateEventsStatusFailed(ctx, tx, failedEventIds)
+					if err != nil {
+						w.logger.Error(
+							"failed to update events status to failed",
+							zap.Error(err),
+							zap.Strings("failed_event_ids", failedEventIds),
+						)
+						return err
+					}
+
+					return nil
+				})
 				if err != nil {
-					w.logger.Error("failed to publish event", zap.Error(err))
-					mutex.Lock()
-					failedEventIds = append(failedEventIds, event.Id)
-					mutex.Unlock()
-					return
+					w.logger.Error("failed to publish events", zap.Error(err))
 				}
-				mutex.Lock()
-				publishedEventIds = append(publishedEventIds, event.Id)
-				mutex.Unlock()
-			}(event)
-		}
-
-		waitGroup.Wait()
-
-		err = w.database.UpdateEventsStatusPublished(ctx, tx, publishedEventIds)
-		if err != nil {
-			w.logger.Error(
-				"failed to update events status to published",
-				zap.Error(err),
-				zap.Strings("published_event_ids", publishedEventIds),
-			)
-			return err
-		}
-
-		err = w.database.UpdateEventsStatusFailed(ctx, tx, failedEventIds)
-		if err != nil {
-			w.logger.Error(
-				"failed to update events status to failed",
-				zap.Error(err),
-				zap.Strings("failed_event_ids", failedEventIds),
-			)
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
-		return err
+				time.Sleep(1 * time.Second)
+			}
+		}()
 	}
-
-	return nil
+	select {}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+
 	"github.com/ArkamFahry/outbox/internal"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
@@ -44,12 +45,5 @@ func main() {
 
 	publisher := internal.NewEventPublisherWorker(database, eventStore, logger)
 
-	for {
-		err = publisher.Work(context.Background())
-		if err != nil {
-			logger.Error("error publishing event",
-				zap.Error(err),
-			)
-		}
-	}
+	publisher.Work(context.Background())
 }
