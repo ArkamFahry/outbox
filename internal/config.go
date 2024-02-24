@@ -43,6 +43,10 @@ func (c *Config) IsValid() error {
 		return fmt.Errorf("nats_url is required")
 	}
 
+	if c.BatchSize > 1000 {
+		return fmt.Errorf("batch_size must be less than or equal to 1000")
+	}
+
 	return nil
 }
 
@@ -60,7 +64,7 @@ func (c *Config) SetDefaults() {
 	}
 
 	if c.BatchSize == 0 {
-		c.BatchSize = 1000
+		c.BatchSize = 500
 	}
 }
 

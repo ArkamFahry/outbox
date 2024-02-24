@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"github.com/ArkamFahry/outbox/internal/models"
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,7 +19,7 @@ var ErrEventNotFound = fmt.Errorf("eventStore not found")
 
 type IDatabase interface {
 	WithTransaction(ctx context.Context, fn func(tx pgx.Tx) error) error
-	GetEvents(ctx context.Context, tx pgx.Tx) ([]*Event, error)
+	GetEvents(ctx context.Context, tx pgx.Tx) ([]*models.Event, error)
 	UpdateEventsStatusPublished(ctx context.Context, tx pgx.Tx, ids []string) error
 	UpdateEventsStatusFailed(ctx context.Context, tx pgx.Tx, ids []string) error
 }
@@ -59,22 +60,18 @@ func (d *Database) WithTransaction(ctx context.Context, fn func(tx pgx.Tx) error
 	return nil
 }
 
-func (d *Database) GetEvents(ctx context.Context, tx pgx.Tx) ([]*Event, error) {
+func (d *Database) GetEvents(ctx context.Context, tx pgx.Tx) ([]*models.Event, error) {
 	query := fmt.Sprintf(`
 	select 
-    	id, 
-    	version, 
+    	id,  
     	aggregate_type, 
     	event_type, 
-    	content, 
-    	status,
-		published_at,
-		created_at
-	from %s where published_at is null limit $1 for update skip locked`, d.config.OutboxTable)
+    	content
+	from %s where status != $1 limit $2 for update skip locked`, d.config.OutboxTable)
 
-	var events []*Event
+	var events []*models.Event
 
-	eventRows, err := tx.Query(ctx, query, d.config.BatchSize)
+	eventRows, err := tx.Query(ctx, query, OutboxEventStatusPublished, d.config.BatchSize)
 	if err != nil {
 		if pgxscan.NotFound(eventRows.Err()) {
 			return nil, ErrEventNotFound
