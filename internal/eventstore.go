@@ -1,13 +1,16 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/ArkamFahry/outbox/internal/models"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
 type IEventStore interface {
-	Publish(event *Event) error
+	Publish(event *models.Event) error
 }
 
 type EventStore struct {
@@ -22,7 +25,24 @@ func NewPublisher(event jetstream.JetStream, config *Config) *EventStore {
 	}
 }
 
-func (es *EventStore) Publish(event *Event) error {
+func (es *EventStore) CreateStream() error {
+	_, err := es.eventStore.CreateStream(context.Background(), jetstream.StreamConfig{
+		Name: es.config.ServiceName,
+		Subjects: []string{
+			fmt.Sprintf("%s.>", es.config.ServiceName),
+		},
+	})
+	if err != nil {
+		if errors.Is(err, jetstream.ErrStreamNameAlreadyInUse) {
+			return nil
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (es *EventStore) Publish(event *models.Event) error {
 	subject := event.Subject(es.config.ServiceName)
 
 	eventBytes, err := json.Marshal(event)
