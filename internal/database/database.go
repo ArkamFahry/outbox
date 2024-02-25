@@ -1,8 +1,9 @@
-package internal
+package database
 
 import (
 	"context"
 	"fmt"
+	"github.com/ArkamFahry/outbox/internal"
 	"github.com/ArkamFahry/outbox/internal/models"
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5"
@@ -26,10 +27,10 @@ type IDatabase interface {
 
 type Database struct {
 	database *pgxpool.Pool
-	config   *Config
+	config   *internal.Config
 }
 
-func NewDatabase(database *pgxpool.Pool, config *Config) *Database {
+func NewDatabase(database *pgxpool.Pool, config *internal.Config) *Database {
 	return &Database{
 		database: database,
 		config:   config,

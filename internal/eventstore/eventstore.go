@@ -1,10 +1,11 @@
-package internal
+package eventstore
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ArkamFahry/outbox/internal"
 	"github.com/ArkamFahry/outbox/internal/models"
 	"github.com/nats-io/nats.go/jetstream"
 )
@@ -15,10 +16,10 @@ type IEventStore interface {
 
 type EventStore struct {
 	eventStore jetstream.JetStream
-	config     *Config
+	config     *internal.Config
 }
 
-func NewPublisher(event jetstream.JetStream, config *Config) *EventStore {
+func NewEventStore(event jetstream.JetStream, config *internal.Config) *EventStore {
 	return &EventStore{
 		eventStore: event,
 		config:     config,
