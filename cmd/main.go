@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"github.com/ArkamFahry/outbox/internal/database"
+	"github.com/ArkamFahry/outbox/internal/eventstore"
 
 	"github.com/ArkamFahry/outbox/internal"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,11 +41,11 @@ func main() {
 		)
 	}
 
-	database := internal.NewDatabase(pgxPool, config)
+	eventDatabase := database.NewDatabase(pgxPool, config)
 
-	eventStore := internal.NewPublisher(jetStreamsClient, config)
+	eventStore := eventstore.NewEventStore(jetStreamsClient, config)
 
-	publisher := internal.NewEventPublisherWorker(database, eventStore, logger)
+	publisher := internal.NewEventPublisherWorker(config, eventDatabase, eventStore, logger)
 
 	publisher.Work(context.Background())
 }
