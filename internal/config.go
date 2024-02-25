@@ -20,6 +20,7 @@ type Config struct {
 	OutboxTable        string `json:"outbox_table" mapstructure:"outbox_table"`
 	PollingInterval    int    `json:"polling_interval" mapstructure:"polling_interval"`
 	BatchSize          int    `json:"batch_size" mapstructure:"batch_size"`
+	WorkerCount        int    `json:"worker_count" mapstructure:"worker_count"`
 }
 
 func (c *Config) IsValid() error {
@@ -47,6 +48,10 @@ func (c *Config) IsValid() error {
 		return fmt.Errorf("batch_size must be less than or equal to 1000")
 	}
 
+	if c.WorkerCount > 20 {
+		return fmt.Errorf("worker_count must be less than or equal to 20")
+	}
+
 	return nil
 }
 
@@ -65,6 +70,10 @@ func (c *Config) SetDefaults() {
 
 	if c.BatchSize == 0 {
 		c.BatchSize = 500
+	}
+
+	if c.WorkerCount == 0 {
+		c.WorkerCount = 5
 	}
 }
 
