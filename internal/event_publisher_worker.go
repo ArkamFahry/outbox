@@ -3,6 +3,8 @@ package internal
 import (
 	"context"
 	"errors"
+	"github.com/ArkamFahry/outbox/internal/database"
+	"github.com/ArkamFahry/outbox/internal/eventstore"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -10,13 +12,15 @@ import (
 )
 
 type EventPublisherWorker struct {
-	database   IDatabase
-	eventStore IEventStore
+	config     *Config
+	database   database.IDatabase
+	eventStore eventstore.IEventStore
 	logger     *zap.Logger
 }
 
-func NewEventPublisherWorker(database IDatabase, eventStore IEventStore, logger *zap.Logger) *EventPublisherWorker {
+func NewEventPublisherWorker(config *Config, database database.IDatabase, eventStore eventstore.IEventStore, logger *zap.Logger) *EventPublisherWorker {
 	return &EventPublisherWorker{
+		config:     config,
 		database:   database,
 		eventStore: eventStore,
 		logger:     logger,
@@ -24,7 +28,7 @@ func NewEventPublisherWorker(database IDatabase, eventStore IEventStore, logger 
 }
 
 func (w *EventPublisherWorker) Work(ctx context.Context) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i <= w.config.WorkerCount; i++ {
 		go func() {
 			for {
 				var publishedEventIds []string
@@ -33,7 +37,7 @@ func (w *EventPublisherWorker) Work(ctx context.Context) {
 				err := w.database.WithTransaction(ctx, func(tx pgx.Tx) error {
 					events, err := w.database.GetEvents(ctx, tx)
 					if err != nil {
-						if errors.Is(err, ErrEventNotFound) {
+						if errors.Is(err, database.ErrEventNotFound) {
 							return nil
 						}
 						w.logger.Error("failed to get events", zap.Error(err))
