@@ -1,6 +1,6 @@
 # Outbox
 
-Outbox is a side car service which reads the a outbox table from PostgreSQL and pushes those outbox events to NATS
+Outbox is a side car service which reads the a outbox table from Postgres and pushes those outbox events to NATS
 
 ## Outbox table structure
 
